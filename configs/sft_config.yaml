@@ -1,0 +1,218 @@
+# Supervised Fine-Tuning (SFT) Configuration
+# This config controls the instruction fine-tuning stage of the pipeline
+# using LoRA/QLoRA for parameter-efficient training.
+
+# =============================================================================
+# Model Configuration
+# =============================================================================
+model:
+  # Base model to fine-tune (HuggingFace model ID or local path)
+  name_or_path: "meta-llama/Llama-2-7b-hf"
+
+  # Whether to use 4-bit quantization (QLoRA)
+  # Enables training on consumer GPUs with limited VRAM
+  load_in_4bit: true
+
+  # Whether to use 8-bit quantization
+  load_in_8bit: false
+
+  # Quantization type for 4-bit (fp4 or nf4)
+  # nf4 (normalized float 4) generally performs better
+  bnb_4bit_quant_type: "nf4"
+
+  # Compute dtype for 4-bit base models
+  bnb_4bit_compute_dtype: "bfloat16"
+
+  # Use double quantization for additional memory savings
+  bnb_4bit_use_double_quant: true
+
+  # Trust remote code for custom model architectures
+  trust_remote_code: false
+
+  # Use Flash Attention 2 if available (requires compatible GPU)
+  use_flash_attention_2: true
+
+# =============================================================================
+# LoRA Configuration
+# =============================================================================
+lora:
+  # LoRA attention dimension (rank)
+  # Higher values = more parameters, more capacity, more memory
+  # Typical values: 8, 16, 32, 64
+  r: 16
+
+  # Alpha parameter for LoRA scaling
+  # Effective scaling = alpha / r
+  # Common practice: set alpha = r or alpha = 2*r
+  lora_alpha: 32
+
+  # Dropout probability for LoRA layers
+  # Helps prevent overfitting on small datasets
+  lora_dropout: 0.05
+
+  # Target modules to apply LoRA
+  # For Llama: ["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"]
+  # For minimal LoRA: ["q_proj", "v_proj"]
+  target_modules:
+    - "q_proj"
+    - "k_proj"
+    - "v_proj"
+    - "o_proj"
+    - "gate_proj"
+    - "up_proj"
+    - "down_proj"
+
+  # Bias training strategy: "none", "all", or "lora_only"
+  bias: "none"
+
+  # Task type for PEFT
+  task_type: "CAUSAL_LM"
+
+  # Modules to save (set to null to save all LoRA modules)
+  modules_to_save: null
+
+# =============================================================================
+# Training Configuration
+# =============================================================================
+training:
+  # Output directory for checkpoints and logs
+  output_dir: "./outputs/sft"
+
+  # Number of training epochs
+  num_train_epochs: 3
+
+  # Per-device training batch size
+  # Reduce if running out of memory
+  per_device_train_batch_size: 4
+
+  # Per-device evaluation batch size
+  per_device_eval_batch_size: 4
+
+  # Number of gradient accumulation steps
+  # Effective batch size = per_device_batch_size * gradient_accumulation_steps * num_gpus
+  gradient_accumulation_steps: 4
+
+  # Learning rate
+  # Typical range for LoRA: 1e-4 to 3e-4
+  learning_rate: 2.0e-4
+
+  # Weight decay for regularization
+  weight_decay: 0.01
+
+  # Maximum gradient norm for clipping
+  max_grad_norm: 1.0
+
+  # Warmup ratio (proportion of total steps)
+  warmup_ratio: 0.03
+
+  # Learning rate scheduler type
+  # Options: "linear", "cosine", "cosine_with_restarts", "polynomial", "constant"
+  lr_scheduler_type: "cosine"
+
+  # Optimizer to use
+  # "adamw_torch" or "adamw_8bit" for memory efficiency
+  optim: "adamw_torch"
+
+  # Logging steps
+  logging_steps: 10
+
+  # Save checkpoint every N steps
+  save_steps: 500
+
+  # Evaluation steps (set to same as save_steps for eval at each checkpoint)
+  eval_steps: 500
+
+  # Maximum number of checkpoints to keep
+  save_total_limit: 3
+
+  # Enable gradient checkpointing to save memory
+  gradient_checkpointing: true
+
+  # Use bf16 mixed precision (requires Ampere+ GPU)
+  bf16: true
+
+  # Use fp16 mixed precision (alternative to bf16)
+  fp16: false
+
+  # Random seed for reproducibility
+  seed: 42
+
+  # DataLoader number of workers
+  dataloader_num_workers: 4
+
+  # Report results to (wandb, tensorboard, none)
+  report_to: "wandb"
+
+# =============================================================================
+# Data Configuration
+# =============================================================================
+data:
+  # Dataset name or path (HuggingFace dataset or local path)
+  dataset_name: "tatsu-lab/alpaca"
+
+  # Dataset split to use for training
+  train_split: "train"
+
+  # Dataset split to use for validation (null for no validation)
+  eval_split: null
+
+  # Validation set size if splitting from training data
+  # Can be float (proportion) or int (absolute number)
+  val_size: 0.05
+
+  # Maximum sequence length for tokenization
+  # Longer sequences will be truncated
+  max_seq_length: 2048
+
+  # Chat template format
+  # Options: "chatml", "alpaca", "vicuna", "llama2", "zephyr", "custom"
+  template_format: "alpaca"
+
+  # Column names in the dataset
+  # Adjust based on your dataset structure
+  instruction_column: "instruction"
+  input_column: "input"
+  output_column: "output"
+
+  # Whether to pack multiple examples into single sequence
+  # Improves training efficiency but may affect quality
+  packing: false
+
+  # Preprocessing number of workers
+  preprocessing_num_workers: 4
+
+  # Shuffle buffer size for streaming datasets
+  shuffle_buffer_size: 10000
+
+# =============================================================================
+# Weights & Biases Configuration
+# =============================================================================
+wandb:
+  # W&B project name
+  project: "rlhf-finetune-pipeline"
+
+  # Run name (null for auto-generated)
+  run_name: null
+
+  # W&B entity (team or username)
+  entity: null
+
+  # Tags for organizing runs
+  tags:
+    - "sft"
+    - "lora"
+
+# =============================================================================
+# DeepSpeed Configuration (for multi-GPU training)
+# =============================================================================
+deepspeed:
+  # Enable DeepSpeed
+  enabled: false
+
+  # DeepSpeed config file path
+  config_file: null
+
+  # DeepSpeed stage (2 or 3)
+  # Stage 2: ZeRO-2 optimizer state partitioning
+  # Stage 3: ZeRO-3 full parameter partitioning
+  stage: 2

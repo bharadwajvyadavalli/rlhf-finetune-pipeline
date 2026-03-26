@@ -1,0 +1,233 @@
+# DPO (Direct Preference Optimization) Configuration
+# This config controls DPO training, which directly optimizes the policy
+# on preference data without explicit reward modeling.
+
+# =============================================================================
+# Model Configuration
+# =============================================================================
+model:
+  # SFT model checkpoint to use as policy initialization
+  policy_model_path: "./outputs/sft"
+
+  # Reference model for KL divergence (null = use policy_model_path)
+  # The reference model is frozen during training
+  ref_model_path: null
+
+  # Whether to use 4-bit quantization
+  load_in_4bit: true
+
+  # Quantization settings
+  bnb_4bit_quant_type: "nf4"
+  bnb_4bit_compute_dtype: "bfloat16"
+  bnb_4bit_use_double_quant: true
+
+  # Use Flash Attention 2
+  use_flash_attention_2: true
+
+  # Trust remote code
+  trust_remote_code: false
+
+# =============================================================================
+# LoRA Configuration
+# =============================================================================
+lora:
+  # Enable LoRA for DPO training
+  enabled: true
+
+  # LoRA rank
+  r: 16
+
+  # LoRA alpha
+  lora_alpha: 32
+
+  # LoRA dropout
+  lora_dropout: 0.05
+
+  # Target modules
+  target_modules:
+    - "q_proj"
+    - "k_proj"
+    - "v_proj"
+    - "o_proj"
+    - "gate_proj"
+    - "up_proj"
+    - "down_proj"
+
+  # Bias
+  bias: "none"
+
+# =============================================================================
+# DPO Hyperparameters
+# =============================================================================
+dpo:
+  # Beta parameter controlling KL penalty strength
+  # Higher beta = more conservative, closer to reference model
+  # Lower beta = more aggressive optimization toward preferences
+  # Typical range: 0.1 - 0.5
+  beta: 0.1
+
+  # Loss type: "sigmoid", "hinge", "ipo", "kto"
+  # sigmoid: Standard DPO loss (Bradley-Terry model)
+  # hinge: Margin-based loss, more robust to noise
+  # ipo: Identity Preference Optimization, different regularization
+  # kto: Kahneman-Tversky Optimization, handles unpaired data
+  loss_type: "sigmoid"
+
+  # Label smoothing for regularization
+  # Helps prevent overconfident predictions
+  label_smoothing: 0.0
+
+  # Reference model log probability computation
+  # "per_token": Compute log probs per token (memory efficient)
+  # "full": Compute full sequence log probs
+  reference_free: false
+
+  # RPO (Relative Preference Optimization) alpha
+  # Set > 0 to use RPO variant
+  rpo_alpha: null
+
+  # Whether to sync reference model to policy periodically
+  sync_ref_model: false
+
+  # Steps between reference model syncs
+  ref_model_sync_steps: 512
+
+# =============================================================================
+# Training Configuration
+# =============================================================================
+training:
+  # Output directory
+  output_dir: "./outputs/dpo"
+
+  # Number of training epochs
+  num_train_epochs: 1
+
+  # Per-device training batch size
+  per_device_train_batch_size: 2
+
+  # Per-device evaluation batch size
+  per_device_eval_batch_size: 2
+
+  # Gradient accumulation steps
+  gradient_accumulation_steps: 8
+
+  # Learning rate (typically lower than SFT)
+  learning_rate: 5.0e-6
+
+  # Weight decay
+  weight_decay: 0.01
+
+  # Maximum gradient norm
+  max_grad_norm: 1.0
+
+  # Warmup ratio
+  warmup_ratio: 0.1
+
+  # Learning rate scheduler
+  lr_scheduler_type: "cosine"
+
+  # Optimizer
+  optim: "adamw_torch"
+
+  # Logging steps
+  logging_steps: 10
+
+  # Save checkpoint every N steps
+  save_steps: 500
+
+  # Evaluation steps
+  eval_steps: 100
+
+  # Maximum checkpoints
+  save_total_limit: 3
+
+  # Gradient checkpointing
+  gradient_checkpointing: true
+
+  # Mixed precision
+  bf16: true
+  fp16: false
+
+  # Random seed
+  seed: 42
+
+  # Report to
+  report_to: "wandb"
+
+# =============================================================================
+# Data Configuration
+# =============================================================================
+data:
+  # Dataset with preference pairs
+  dataset_name: "Anthropic/hh-rlhf"
+
+  # Training split
+  train_split: "train"
+
+  # Evaluation split
+  eval_split: "test"
+
+  # Maximum sequence length (prompt + response)
+  max_seq_length: 2048
+
+  # Maximum prompt length
+  max_prompt_length: 512
+
+  # Column names
+  prompt_column: "prompt"
+  chosen_column: "chosen"
+  rejected_column: "rejected"
+
+  # Preprocessing workers
+  preprocessing_num_workers: 4
+
+  # Whether prompt is included in chosen/rejected columns
+  # If true, will extract prompt from responses
+  # If false, will concatenate prompt with responses
+  prompt_in_response: true
+
+# =============================================================================
+# Weights & Biases Configuration
+# =============================================================================
+wandb:
+  project: "rlhf-finetune-pipeline"
+  run_name: null
+  entity: null
+  tags:
+    - "dpo"
+    - "alignment"
+    - "preference-learning"
+
+# =============================================================================
+# Evaluation Configuration
+# =============================================================================
+evaluation:
+  # Enable evaluation during training
+  enabled: true
+
+  # Metrics to track
+  metrics:
+    - "accuracy"  # Preference accuracy (chosen > rejected)
+    - "margin"    # Average margin between chosen and rejected
+    - "log_prob_chosen"
+    - "log_prob_rejected"
+
+  # Generate samples for qualitative evaluation
+  generate_samples: true
+  num_samples: 10
+
+# =============================================================================
+# Advanced Configuration
+# =============================================================================
+advanced:
+  # Precompute reference model log probs (saves memory during training)
+  precompute_ref_log_probs: false
+
+  # Padding strategy: "max_length", "longest"
+  padding: "max_length"
+
+  # Truncation side: "left", "right"
+  truncation_side: "left"
+
+  # Dataset caching
+  use_cache: true

@@ -1,0 +1,269 @@
+# PPO (Proximal Policy Optimization) Configuration
+# This config controls RLHF training using PPO with a trained reward model.
+
+# =============================================================================
+# Model Configuration
+# =============================================================================
+model:
+  # SFT model checkpoint to use as policy initialization
+  policy_model_path: "./outputs/sft"
+
+  # Reward model checkpoint
+  reward_model_path: "./outputs/reward"
+
+  # Reference model for KL penalty (null = use policy_model_path)
+  # Can be set to a different checkpoint to control divergence
+  ref_model_path: null
+
+  # Whether to use 4-bit quantization for models
+  load_in_4bit: true
+
+  # Quantization settings
+  bnb_4bit_quant_type: "nf4"
+  bnb_4bit_compute_dtype: "bfloat16"
+  bnb_4bit_use_double_quant: true
+
+  # Use Flash Attention 2
+  use_flash_attention_2: true
+
+  # Share layers between policy and value model
+  # Set to false for separate value head
+  share_layers: true
+
+# =============================================================================
+# LoRA Configuration
+# =============================================================================
+lora:
+  # Enable LoRA for PPO training
+  enabled: true
+
+  # LoRA rank
+  r: 16
+
+  # LoRA alpha
+  lora_alpha: 32
+
+  # LoRA dropout
+  lora_dropout: 0.05
+
+  # Target modules
+  target_modules:
+    - "q_proj"
+    - "k_proj"
+    - "v_proj"
+    - "o_proj"
+    - "gate_proj"
+    - "up_proj"
+    - "down_proj"
+
+  # Bias
+  bias: "none"
+
+# =============================================================================
+# PPO Hyperparameters
+# =============================================================================
+ppo:
+  # KL penalty coefficient (beta)
+  # Higher values = more conservative updates, stay closer to reference
+  # Typical range: 0.01 - 0.2
+  init_kl_coef: 0.1
+
+  # Target KL divergence for adaptive KL penalty
+  # Set to null to disable adaptive KL
+  target_kl: 6.0
+
+  # KL penalty type: "kl", "abs", "mse", "full"
+  kl_penalty: "kl"
+
+  # Discount factor (gamma) for reward calculation
+  gamma: 1.0
+
+  # GAE (Generalized Advantage Estimation) lambda
+  # Higher values = more bias, lower variance
+  # Typical range: 0.9 - 0.99
+  lam: 0.95
+
+  # PPO clip range for policy updates
+  # Typical range: 0.1 - 0.3
+  cliprange: 0.2
+
+  # Value function clip range
+  # Set to null to disable value clipping
+  cliprange_value: 0.2
+
+  # Entropy coefficient for exploration bonus
+  # Higher values = more exploration
+  ent_coef: 0.01
+
+  # Value function coefficient in loss
+  vf_coef: 0.5
+
+  # Maximum gradient norm
+  max_grad_norm: 1.0
+
+  # Number of PPO epochs per batch
+  ppo_epochs: 4
+
+  # Advantage normalization
+  whiten_rewards: true
+
+  # Reward scaling factor
+  reward_scale: 1.0
+
+  # Reward clipping (set to null to disable)
+  reward_clip: 10.0
+
+# =============================================================================
+# Training Configuration
+# =============================================================================
+training:
+  # Output directory
+  output_dir: "./outputs/ppo"
+
+  # Total number of training steps
+  total_steps: 10000
+
+  # Batch size for rollout collection (number of prompts)
+  rollout_batch_size: 64
+
+  # Mini-batch size for PPO updates
+  mini_batch_size: 8
+
+  # Learning rate
+  learning_rate: 1.0e-5
+
+  # Weight decay
+  weight_decay: 0.01
+
+  # Warmup steps
+  warmup_steps: 100
+
+  # Learning rate scheduler
+  lr_scheduler_type: "cosine"
+
+  # Optimizer
+  optim: "adamw_torch"
+
+  # Gradient accumulation steps
+  gradient_accumulation_steps: 1
+
+  # Gradient checkpointing
+  gradient_checkpointing: true
+
+  # Mixed precision
+  bf16: true
+  fp16: false
+
+  # Logging steps
+  logging_steps: 1
+
+  # Save checkpoint every N steps
+  save_steps: 500
+
+  # Evaluation steps
+  eval_steps: 100
+
+  # Maximum checkpoints
+  save_total_limit: 5
+
+  # Random seed
+  seed: 42
+
+  # Report to
+  report_to: "wandb"
+
+# =============================================================================
+# Generation Configuration
+# =============================================================================
+generation:
+  # Maximum new tokens to generate
+  max_new_tokens: 256
+
+  # Minimum new tokens
+  min_new_tokens: 16
+
+  # Temperature for sampling
+  temperature: 0.7
+
+  # Top-p (nucleus) sampling
+  top_p: 0.9
+
+  # Top-k sampling (0 = disabled)
+  top_k: 0
+
+  # Repetition penalty
+  repetition_penalty: 1.0
+
+  # Do sample (set to false for greedy decoding)
+  do_sample: true
+
+  # Number of responses to generate per prompt
+  num_return_sequences: 1
+
+  # Pad token handling
+  pad_token_id: null  # Will be set from tokenizer
+
+# =============================================================================
+# Data Configuration
+# =============================================================================
+data:
+  # Dataset with prompts for RL training
+  dataset_name: "Anthropic/hh-rlhf"
+
+  # Column containing prompts
+  prompt_column: "prompt"
+
+  # Maximum prompt length
+  max_prompt_length: 512
+
+  # Preprocessing workers
+  preprocessing_num_workers: 4
+
+# =============================================================================
+# Reward Processing
+# =============================================================================
+reward:
+  # Use reward model or rule-based rewards
+  use_reward_model: true
+
+  # Normalize rewards across batch
+  normalize: true
+
+  # Add penalty for specific behaviors
+  length_penalty: 0.0  # Penalty per token (negative discourages length)
+
+  # Baseline reward subtraction method: "mean", "running_mean", "none"
+  baseline: "mean"
+
+# =============================================================================
+# Weights & Biases Configuration
+# =============================================================================
+wandb:
+  project: "rlhf-finetune-pipeline"
+  run_name: null
+  entity: null
+  tags:
+    - "ppo"
+    - "rlhf"
+    - "alignment"
+
+# =============================================================================
+# Evaluation Configuration
+# =============================================================================
+evaluation:
+  # Enable evaluation during training
+  enabled: true
+
+  # Number of samples for evaluation
+  num_samples: 100
+
+  # Evaluation prompts dataset (null = use training data)
+  eval_dataset: null
+
+  # Metrics to track
+  metrics:
+    - "reward_mean"
+    - "reward_std"
+    - "kl_divergence"
+    - "response_length"
+    - "entropy"

@@ -1,0 +1,214 @@
+# Reward Model Training Configuration
+# This config controls training of the reward model using Bradley-Terry
+# preference modeling for predicting human preferences.
+
+# =============================================================================
+# Model Configuration
+# =============================================================================
+model:
+  # Base model to use as reward model backbone
+  # Should match or be similar to the SFT model
+  name_or_path: "meta-llama/Llama-2-7b-hf"
+
+  # Whether to use 4-bit quantization
+  load_in_4bit: true
+
+  # Whether to use 8-bit quantization
+  load_in_8bit: false
+
+  # Quantization type for 4-bit
+  bnb_4bit_quant_type: "nf4"
+
+  # Compute dtype for 4-bit base models
+  bnb_4bit_compute_dtype: "bfloat16"
+
+  # Use double quantization
+  bnb_4bit_use_double_quant: true
+
+  # Trust remote code
+  trust_remote_code: false
+
+  # Use Flash Attention 2
+  use_flash_attention_2: true
+
+  # Number of transformer layers to freeze from bottom
+  # Freezing early layers can speed up training and improve stability
+  # Set to 0 to train all layers
+  num_frozen_layers: 0
+
+# =============================================================================
+# Reward Head Configuration
+# =============================================================================
+reward_head:
+  # Hidden dimension for reward head MLP (null = use model hidden size)
+  hidden_dim: null
+
+  # Number of hidden layers in reward head
+  num_layers: 1
+
+  # Dropout in reward head
+  dropout: 0.1
+
+  # Activation function: "relu", "gelu", "silu"
+  activation: "relu"
+
+  # Initialize reward head to output near-zero values
+  # Helps with training stability
+  init_near_zero: true
+
+# =============================================================================
+# LoRA Configuration (for parameter-efficient reward modeling)
+# =============================================================================
+lora:
+  # Enable LoRA for reward model training
+  enabled: true
+
+  # LoRA rank
+  r: 16
+
+  # LoRA alpha
+  lora_alpha: 32
+
+  # LoRA dropout
+  lora_dropout: 0.05
+
+  # Target modules
+  target_modules:
+    - "q_proj"
+    - "k_proj"
+    - "v_proj"
+    - "o_proj"
+
+  # Bias training strategy
+  bias: "none"
+
+# =============================================================================
+# Training Configuration
+# =============================================================================
+training:
+  # Output directory
+  output_dir: "./outputs/reward"
+
+  # Number of training epochs
+  num_train_epochs: 1
+
+  # Per-device training batch size
+  per_device_train_batch_size: 2
+
+  # Per-device evaluation batch size
+  per_device_eval_batch_size: 2
+
+  # Gradient accumulation steps
+  gradient_accumulation_steps: 8
+
+  # Learning rate (typically lower than SFT)
+  learning_rate: 1.0e-5
+
+  # Weight decay
+  weight_decay: 0.01
+
+  # Maximum gradient norm
+  max_grad_norm: 1.0
+
+  # Warmup ratio
+  warmup_ratio: 0.1
+
+  # Learning rate scheduler
+  lr_scheduler_type: "cosine"
+
+  # Optimizer
+  optim: "adamw_torch"
+
+  # Logging steps
+  logging_steps: 10
+
+  # Save checkpoint every N steps
+  save_steps: 500
+
+  # Evaluation steps
+  eval_steps: 100
+
+  # Maximum checkpoints to keep
+  save_total_limit: 3
+
+  # Gradient checkpointing
+  gradient_checkpointing: true
+
+  # Mixed precision
+  bf16: true
+  fp16: false
+
+  # Random seed
+  seed: 42
+
+  # Report to
+  report_to: "wandb"
+
+# =============================================================================
+# Preference Data Configuration
+# =============================================================================
+data:
+  # Dataset name or path
+  dataset_name: "Anthropic/hh-rlhf"
+
+  # Training split
+  train_split: "train"
+
+  # Evaluation split
+  eval_split: "test"
+
+  # Maximum sequence length
+  max_seq_length: 2048
+
+  # Column names for preference pairs
+  chosen_column: "chosen"
+  rejected_column: "rejected"
+
+  # Preprocessing workers
+  preprocessing_num_workers: 4
+
+# =============================================================================
+# Loss Configuration
+# =============================================================================
+loss:
+  # Loss type: "bradley_terry", "margin", "hinge"
+  type: "bradley_terry"
+
+  # Margin for margin-based loss
+  # Encourages larger reward gap between chosen and rejected
+  margin: 0.0
+
+  # Label smoothing for regularization
+  label_smoothing: 0.0
+
+  # Whether to use length-normalized rewards
+  # Can help prevent length exploitation
+  length_normalize: false
+
+# =============================================================================
+# Weights & Biases Configuration
+# =============================================================================
+wandb:
+  project: "rlhf-finetune-pipeline"
+  run_name: null
+  entity: null
+  tags:
+    - "reward-model"
+    - "preference-learning"
+
+# =============================================================================
+# Analysis Configuration
+# =============================================================================
+analysis:
+  # Enable reward distribution analysis during training
+  enabled: true
+
+  # Steps between analysis runs
+  analysis_steps: 500
+
+  # Number of samples for analysis
+  num_samples: 1000
+
+  # Track metrics for reward hacking detection
+  track_length_correlation: true
+  track_reward_distribution: true
